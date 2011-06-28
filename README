@@ -1,0 +1,28 @@
+D-STAR SWITCHING MATRIX TOOLKIT
+
+The goal of the DSTK is as simple as ambitious: design a system able to switch any kind of 
+D-STAR related stream, from any input to any output and -at the mean time- process it in any
+way possible.
+
+Possible "Streams" can be:
+- AMBE digital voice streams
+- PCM or any other non-AMBE encoded digital voice streams
+- slow-speed data
+- digital data
+- logging information
+
+
+
+Input can be:
+- AMBE Digital-Voice sources:
+-> streams originating on a local RF-module
+-> streams originating from a remote system, coming in over the internet using the callsign routing protocol
+-> streams from remote repeaters or reflectors using linking protocols
+-> local files in AMBE format
+
+- non-AMBE Digital-Voice sources:
+-> analog input via the "audio in" from a server
+-> local files in PCM format
+-> application generating PCM streams
+-> voip-applications
+-> audio-streams from 
