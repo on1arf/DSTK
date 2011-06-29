@@ -4,25 +4,127 @@ The goal of the DSTK is as simple as ambitious: design a system able to switch a
 D-STAR related stream, from any input to any output and -at the mean time- process it in any
 way possible.
 
-Possible "Streams" can be:
+"Streams" can be:
 - AMBE digital voice streams
 - PCM or any other non-AMBE encoded digital voice streams
 - slow-speed data
 - digital data
 - logging information
+- DTMF information
+- Application heartbeats, applications comments
 
 
-
-Input can be:
-- AMBE Digital-Voice sources:
--> streams originating on a local RF-module
--> streams originating from a remote system, coming in over the internet using the callsign routing protocol
--> streams from remote repeaters or reflectors using linking protocols
--> local files in AMBE format
-
-- non-AMBE Digital-Voice sources:
--> analog input via the "audio in" from a server
--> local files in PCM format
--> application generating PCM streams
+"Input" can be:
+-> AMBE streams originating on a local RF-module
+-> AMBE streams originating from a remote system, coming in over the internet using the callsign routing protocol or Starnet digital
+-> AMBE streams from remote repeaters or reflectors using linking protocols (dplus, dextra)
+-> local files
+-> analog input via the "audio in" of the server-computer
+-> application generating audio streams (usually in PCM format)
 -> voip-applications
--> audio-streams from 
+-> audio-streams from non-digital repeaterlinking systems (echolink, IRLP, ...)
+
+
+"Output" can be:
+-> local repeater modules
+-> local files
+-> remote repeaters over the internet, using callsign routing protocols
+-> remote repeaters over the internet, using linking protocols (dplus, dextra)
+-> voip-applications
+-> audio-streams to non-digital repeater linking systems (echolink, IRLP)
+-> external applications taking in audio-streams (usually in PCM format)
+-> external applications taking in non-audio streams (e.g. DTMF codes)
+
+
+"Processing" can be:
+-> transcoding audio codec formats (AMBE, PCM, ogg, speex, mp3)
+-> information extracting: e.g. DTMF detection
+-> selection: e.g. filter one particular module from a stream
+
+
+
+
+
+
+To achieve this, the D-STAR switching-matrix toolkit uses an approach based
+on "parallel programming":
+
+- every module (input, output or processing) is a seperate program ("tool")
+which executes one particular element of the switching matrix.
+- modules communicate to eachother using IP multicast streams
+- "application" are build, by combining a number of "tools", just like a LEGO
+house is build by combining seperate LEGO building-blocks.
+- in a lot of cases, external applications (non d-star related applications) are
+added to achieve certain goals
+
+- IP-multicast allows for "one-to-many", "many-to-one" and "many-to-many"
+communication. This means that
+-> one input module can server any number of processing or output modules
+-> multiple inputs can be combined into one stream.
+
+
+- the IP multicast streams are fully documented, allowing everybody to write
+extensions to the D-STAR switching-matrix.
+- individual modules are by preference open-source to maximise reuse and
+extensability.
+
+
+This approach is designed to give operators of D-STAR systems maximum freedom to
+create any application he or she wants, without any limitations impossed by the
+programmers of the individual tools.
+
+
+
+Examples or applications are:
+
+* Voice announcement system:
+
+- input: local file containg audio-information in PCM format
+- processing: audio conversion of PCM to AMB format
+- output: local repeater RF-module
+
+
+* DTMF control:
+
+- input: capture of digital stream between RPC (repeater controller) and gateway-server
+on a i-com based repeater
+- processing: extract AMBE information from RPC stream
+- processing: extract DTMF information from AMBE stream
+- output: DTMF information to external appplication
+- external application: perl-script written by the sysop of the repeater, controlling
+repeater-linking based on DTMF codes
+
+
+
+* Internet-stream of a reflector stream
+- input: reflector client-software, receiving information from dplus or dextra reflector
+- processing: select audio from one particular module
+- processing: audio convertion of AMB to PCM format
+- output: PCM stream to external application, adding silence and comfort noise when
+no digital-voice stream is being received
+- external application "ices": internet-streaming "source" 
+- external application "icecast":  internet-streaming server
+
+
+* cross-mode FM/D-STAR repeater
+- input1: capture of digital stream between RPC (repeater controller) and
+gateway-server on a i-com based repeater
+- processing1a: extract AMBE information from RPC stream
+- processing1b: audio conversion of AMBE to PCM format
+
+- input2: "RX" of FM tranceiver, linked to "audio-in" of gateway-server,
+resulting in PCM-stream
+- processing2: audio-conversion of PCM to AMBE format
+
+- output1: combined output of "processing1a" and "processing2", send to RF-module
+of D-STAR repeater (no mixing, "first come, first serve" principle).
+- output2: combined output of "processing1b" and "input2", send to "audio-out" of
+gateway-server, connected to "TX" of FM tranceiver
+
+
+Practicle examples of real-live applications will be added in the "docs" directory
+
+
+
+73
+Kristoff ON1ARF
