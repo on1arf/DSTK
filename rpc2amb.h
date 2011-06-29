@@ -1,9 +1,10 @@
-// c2m.h //
+// rpc2amb.h //
 
-// c2m.h: join to C-stream, filter on one partical module + streams and rebroadcast stream
+// rpc2amb: join 'RPCIP'-stream, and multicast out as one 'AMB'-stream
+// per module
 
 
-// copyright (C) 2010 Kristoff Bonne ON1ARF
+// copyright (C) 2011 Kristoff Bonne ON1ARF
 /*
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -21,7 +22,7 @@
 */
 
 //  release info:
-// 19 may 2011: version 0.0.1. Initial release
+// 14 jun. 2011: version 0.0.1. Initial release
 
 // global DEFINEs
 #define ETHERNETMTU 1500

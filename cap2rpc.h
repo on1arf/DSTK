@@ -6,7 +6,7 @@
 // upwards.
 
 
-// copyright (C) 2010 Kristoff Bonne ON1ARF
+// copyright (C) 2011 Kristoff Bonne ON1ARF
 /*
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
