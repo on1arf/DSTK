@@ -40,16 +40,16 @@ if (init == 0) {
 		exit(-1);
 	}; // end if
 
-fprintf(stderr,"Streaming to addr %s poort %d \n",global.s_ipaddress, global.s_port);
+fprintf(stderr,"Streaming to addr %s poort %d \n",global.d_ipaddress, global.d_port);
 
 	// packets are send to multicast address, UDP port 40000 or 40001
 	MulticastOutAddr.sin6_family = AF_INET6; 
 	MulticastOutAddr.sin6_scope_id = 1;
-	MulticastOutAddr.sin6_port = htons((unsigned short int) global.s_port);
+	MulticastOutAddr.sin6_port = htons((unsigned short int) global.d_port);
 
-	ret=inet_pton(AF_INET6,global.s_ipaddress,(void *)&MulticastOutAddr.sin6_addr);
+	ret=inet_pton(AF_INET6,global.d_ipaddress,(void *)&MulticastOutAddr.sin6_addr);
 	if (ret != 1) {
-		fprintf(stderr,"Error: could not convert %s into valid address. Exiting\n",global.s_ipaddress);
+		fprintf(stderr,"Error: could not convert %s into valid address. Exiting\n",global.d_ipaddress);
 		exit(1);
 	}; // end if
 
