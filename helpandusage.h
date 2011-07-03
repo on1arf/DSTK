@@ -22,6 +22,12 @@ void usage (char * prog) {
 	return;
 #endif
 
+#ifdef PCM2STDOUT
+	fprintf(stderr,"Usage: %s [-v] [ [-s] || [-n] ]  [-si ipaddress] [-sp port]\n",prog);
+	fprintf(stderr,"Usage: -V\n");
+	fprintf(stderr,"Usage: -h\n");
+	return;
+#endif
 
 // unknown application
 fprintf(stderr,"Error, called \"usage\" in unknown application! \n");
@@ -112,6 +118,30 @@ void help (char * prog) {
 	fprintf(stderr,"\n");
 	fprintf(stderr,"-v: increase verboselevel (may be used multiple times)\n");
 
+	return;
+#endif
+
+#ifdef PCM2STDOUT
+	fprintf(stderr,"%s: Sent PCM stream to external application or file via standard-out.\n", prog);
+	fprintf(stderr,"\n");
+	fprintf(stderr,"Usage: %s [-v] [ [-s] || [-n] ]  [-si ipaddress] [-sp port]\n",prog);
+	fprintf(stderr,"\n");
+	fprintf(stderr,"This application subscribes to a PCM multicast-stream, send it to standard-out,\n");
+	fprintf(stderr,"optionally adding silence or comfort noise when no audio is being received.\n");
+	fprintf(stderr,"\n");
+	fprintf(stderr,"This application can be used to save a PCM-stream to a file or\n");
+	fprintf(stderr,"pipe it to an external application for further processing\n");
+	fprintf(stderr,"As the length of the PCM-stream is not known beforehand, this application\n");
+	fprintf(stderr,"generated  \"raw\" PCM without a PCM-header.\n");
+	fprintf(stderr,"\n");
+	fprintf(stderr,"Options:\n");
+	fprintf(stderr,"-si: source IP-address (default %s)\n",default_s_ipaddress);
+	fprintf(stderr,"-sp: source UDP port (default %d)\n",default_s_port);
+	fprintf(stderr,"\n");
+	fprintf(stderr,"-s: generate silence when no data is received\n");
+	fprintf(stderr,"-n: generate noise when no data is received\n");
+	fprintf(stderr,"\n");
+	fprintf(stderr,"-v: increase verboselevel (may be used multiple times)\n");
 	return;
 #endif
 
