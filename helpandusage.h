@@ -29,6 +29,13 @@ void usage (char * prog) {
 	return;
 #endif
 
+#ifdef XRF2AMB
+	fprintf(stderr,"Usage: %s [-v] [-4] [-6]  [-di ipaddress] [-dp port] [-dpi portincrease] [-rp port] MYCALL reflectorhost\n",prog);
+	fprintf(stderr,"Usage: -V\n");
+	fprintf(stderr,"Usage: -h\n");
+	return;
+#endif
+
 // unknown application
 fprintf(stderr,"Error, called \"usage\" in unknown application! \n");
 
