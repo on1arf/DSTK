@@ -44,6 +44,8 @@ uint32_t thisframetype;
 // other stuff
 int missed;
 
+char * texttoprint;
+
 // networking vars
 int sock_in;
 
@@ -64,6 +66,9 @@ int streamid;
 
 // init vars
 activestatus=0;
+
+texttoprint=strndup("RPT1=        ,RPT2=        ,YOUR=        ,MY=        /    ",63);
+
 
 // init function
 pglobal->welive_mccapture=1;
@@ -220,13 +225,13 @@ fprintf(stderr,"type = %08X, after filter = %08X, should have %08X \n",ntohl(dst
 
 	// info: status: 0 = no DV stream active, 1 = stream active
 
-
 	// what kind of packet it is?
 	// is it a start-of-stream packet
 	if (thisframetype == TYPE_AMB_CFG) {
 
 		// check "STRHDR1" flag. If set, the AMBE-frames also contain a "DSTAR stream header1"
 		// header which is not used here
+		// but we DO need to jump over it
 
 		if (ntohl(dstkhead_in->type) & TYPEMASK_FLG_AMB_STRHDR1) {
 			// set pointer to DV-header
@@ -243,6 +248,13 @@ fprintf(stderr,"type = %08X, after filter = %08X, should have %08X \n",ntohl(dst
 			this_dv_rf_header = (struct dstar_dv_rf_header *) (receivebuffer + dstkheaderoffset + sizeof(dstkheader_str) + sizeof(struct dstar_dv_header));
 
 		}; // end else - if
+
+                memcpy(&texttoprint[5],&this_dv_rf_header->rpt1_callsign,8);
+                memcpy(&texttoprint[19],&this_dv_rf_header->rpt2_callsign,8);
+                memcpy(&texttoprint[33],&this_dv_rf_header->your_callsign,8);
+                memcpy(&texttoprint[45],&this_dv_rf_header->my_callsign,8);
+                memcpy(&texttoprint[54],&this_dv_rf_header->my_callsign_ext,4);
+                fprintf(stderr,"RPT: %s, direction = %d\n",texttoprint,direction);
 
 		// accept it when
 		// status is 0 (no DV-stream active)

@@ -34,6 +34,9 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <fcntl.h>
+
+// to get rid of annoying warning about strndump
+#define __USE_GNU
 #include <string.h>
 #include <stdint.h>
 
@@ -252,6 +255,10 @@ for (paramloop=1;paramloop<argc;paramloop++) {
 	} else if (strcmp(thisarg,"-V") == 0) {
 		// -V = version
 			fprintf(stderr,"%s version %s\n",argv[0],VERSION);
+			exit(0);
+	} else if (strcmp(thisarg,"-h") == 0) {
+		// -h = help
+			help(argv[0]);
 			exit(0);
 	} else if (strcmp(thisarg,"-g") == 0) {
 	// -g = ambe gain

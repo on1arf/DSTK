@@ -187,7 +187,7 @@ typedef struct {
 
 // typemask flags common for ALL types of data (4 Most significant bit)
 
-#define TYPEMASK_FLG_DIR   0x0080000 // direction: 0=inbound, 1=outbound
+#define TYPEMASK_FLG_DIR   0x00800000 // direction: 0=inbound, 1=outbound
 
 // "first" and "last" flag: set during the beginning or the end
 // of a stream. Only used when this information cannot be retrieved

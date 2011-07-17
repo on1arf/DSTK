@@ -24,6 +24,7 @@
 // release info:
 // 14 jun. 2011: version 0.0.1. Initial release
 
+
 #define VERSION "0.0.1"
 #define RPC2AMB
 
@@ -31,6 +32,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <fcntl.h>
+
 #include <string.h>
 #include <stdint.h>
 
