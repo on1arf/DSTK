@@ -3,7 +3,7 @@
 // dstk.h: structures and defines for the DSTAR switching-matric Toolkit
 
 
-// copyright (C) 2011 Kristoff Bonne ON1ARF
+// copyright (C) 2010 Kristoff Bonne ON1ARF
 /*
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -21,7 +21,7 @@
 */
 
 //  release info:
-// 14 jun. 2011: version 0.0.1. Initial release
+// 19 may 2011: version 0.0.1. Initial release
 
 // global DEFINEs
 #define ETHERNETMTU 1500
@@ -170,10 +170,15 @@ typedef struct {
 #define TYPE_PCM_FLL 0x0302 // empty PCM-frame used for stuffing when no
                             //  valid DV-frames received. Only used when the
                             // "sendalways" DEBUG flag is set
-#define TYPE_PCM_LOSREP 0x0303 // repetition of previous PCM-frame do deal
+#define TYPE_PCM_LOSREP 0x0303 // repetition of previous PCM-frame to deal
                                // with packetloss
 
 #define TYPE_PCM_LOSSIL 0x0304 // empty (silent) PCM-frame do deal with packetloss
+
+
+// all kind of "other", numbered from 0xE000 upwards, no further logical in numbering
+#define TYPE_OTH_DPLGWMSG 0xe000 // "gwmsg=" message coming from DPLUS gateway
+
 
 // types common to multiple type of DSTK frames
 // group 0: DV-frames
@@ -187,7 +192,7 @@ typedef struct {
 
 // typemask flags common for ALL types of data (4 Most significant bit)
 
-#define TYPEMASK_FLG_DIR   0x00800000 // direction: 0=inbound, 1=outbound
+#define TYPEMASK_FLG_DIR   0x0080000 // direction: 0=inbound, 1=outbound
 
 // "first" and "last" flag: set during the beginning or the end
 // of a stream. Only used when this information cannot be retrieved
@@ -291,7 +296,17 @@ struct dstar_dv_rf_header {
 
 
 struct dplus_size_header {
-	uint16_t size; // network-order! top 3 bits contain flags
+	// dplus size header: 2 octets, network-order! top3 bits contain flags
+	uint16_t size;
+}; // end 
+
+struct dplus_control_item {
+	// commands and replies of the dplus protocol use a control-item
+	// structure simular to the one used when communication with the
+	// DVdongle.
+
+	// this structure is not used when transporting DV frames
+	uint16_t controlitem;
 }; // end 
 
 // end data structure configuration

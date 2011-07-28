@@ -30,7 +30,14 @@ void usage (char * prog) {
 #endif
 
 #ifdef XRF2AMB
-	fprintf(stderr,"Usage: %s [-v] [-4] [-6]  [-di ipaddress] [-dp port] [-dpi portincrease] [-rp port] MYCALL reflectorhost\n",prog);
+	fprintf(stderr,"Usage: %s [-v] [-4] [-6]  [-di ipaddress] [-dp port] [-dpi portincrease] [-rp port] MYCALL gateway gatewayhost\n",prog);
+	fprintf(stderr,"Usage: -V\n");
+	fprintf(stderr,"Usage: -h\n");
+	return;
+#endif
+
+#ifdef DPL2AMB
+	fprintf(stderr,"Usage: %s [-v] [-4] [-6]  [-di ipaddress] [-dp port] [-dpi portincrease] [-rp port] MYCALL gateway gatewayhost\n",prog);
 	fprintf(stderr,"Usage: -V\n");
 	fprintf(stderr,"Usage: -h\n");
 	return;
@@ -147,6 +154,53 @@ void help (char * prog) {
 	fprintf(stderr,"\n");
 	fprintf(stderr,"-s: generate silence when no data is received\n");
 	fprintf(stderr,"-n: generate noise when no data is received\n");
+	fprintf(stderr,"\n");
+	fprintf(stderr,"-v: increase verboselevel (may be used multiple times)\n");
+	return;
+#endif
+
+#ifdef XRF2AMB
+	fprintf(stderr,"%s: Connect to X-reflector/gateway and forward traffic to AMBE stream.\n",prog);
+	fprintf(stderr,"\n");
+	fprintf(stderr,"Usage: %s [-v] [-4] [-6]  [-di ipaddress] [-dp port] [-dpi portincrease] [-rp port] MYCALL reflectorhost\n",prog);
+	fprintf(stderr,"\n");
+	fprintf(stderr,"This application connects to a dextra X-reflector or a remote gateway using the\n");
+	fprintf(stderr,"dextra linking protocol, simulating a DVdongle client\n");
+	fprintf(stderr,"and forwards traffic received from the reflector to a local AMBE stream.\n");
+	fprintf(stderr,"\n");
+	fprintf(stderr,"Options:\n");
+	fprintf(stderr,"-di: destination IP-address (default %s)\n",default_d_ipaddress);
+	fprintf(stderr,"-dp: destination UDP port (default %d)\n",default_d_port);
+	fprintf(stderr,"-dpi: destination UDP port increasement (default %d)\n",default_d_portincr);
+	fprintf(stderr,"\n");
+	fprintf(stderr,"-rp: remote UDP port of reflector or gateway (default %d)\n",default_reflectorport);
+	fprintf(stderr,"\n");
+	fprintf(stderr,"-4: force ipv4-only address resolution of reflectorhost\n");
+	fprintf(stderr,"-6: force ipv6-only address resolution of reflectorhost\n");
+	fprintf(stderr,"\n");
+	fprintf(stderr,"-v: increase verboselevel (may be used multiple times)\n");
+	return;
+#endif
+
+
+#ifdef DPL2AMB
+	fprintf(stderr,"%s: Connect to dplus reflector/gateway and forward traffic to AMBE stream.\n",prog);
+	fprintf(stderr,"\n");
+	fprintf(stderr,"Usage: %s [-v] [-4] [-6]  [-di ipaddress] [-dp port] [-dpi portincrease] [-rp port] MYCALL gateway gatewayhost\n",prog);
+	fprintf(stderr,"\n");
+	fprintf(stderr,"This application connects to a dplus reflector or a remote gateway using the\n");
+	fprintf(stderr,"dplus linking protocol, simulating a DVdongle client\n");
+	fprintf(stderr,"and forwards traffic received from the reflector to a local AMBE stream.\n");
+	fprintf(stderr,"\n");
+	fprintf(stderr,"Options:\n");
+	fprintf(stderr,"-di: destination IP-address (default %s)\n",default_d_ipaddress);
+	fprintf(stderr,"-dp: destination UDP port (default %d)\n",default_d_port);
+	fprintf(stderr,"-dpi: destination UDP port increasement (default %d)\n",default_d_portincr);
+	fprintf(stderr,"\n");
+	fprintf(stderr,"-rp: remote UDP port of reflector or gateway (default %d)\n",default_gatewayport);
+	fprintf(stderr,"\n");
+	fprintf(stderr,"-4: force ipv4-only address resolution of reflectorhost\n");
+	fprintf(stderr,"-6: force ipv6-only address resolution of reflectorhost\n");
 	fprintf(stderr,"\n");
 	fprintf(stderr,"-v: increase verboselevel (may be used multiple times)\n");
 	return;

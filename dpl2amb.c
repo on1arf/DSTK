@@ -1,11 +1,12 @@
-/* xrf2amb.c */
+/* dpl2amb.c */
 
-// xrf2amb: link to a dextra X-reflector and re-broadcast the received
-// AMBE-streams as a DSTK AMBE stream
+// dpl2amb: link to a remote gateway or reflector using the Dplus protocol
+//  and rebroadcast the received AMBE-streams to a DSTK AMBE stream
 
-// Usage: xrf2amb [-v] [ [-4] || [-6] ]  [-di ipaddress] [-dp port] [-dpi portincrease] [-rp reflectorport] MYCALL reflectorhost
-// Usage: xrf2amb -h
-// Usage: xrf2amb -V
+
+// Usage: dpl2amb [-v] [ [-4] || [-6] ]  [-di ipaddress] [-dp port] [-dpi portincrease] [-rp remotegatewayport] MYCALL gateway gatewayhost
+// Usage: dpl2amb -h
+// Usage: dpl2amb -V
 
 // copyright (C) 2011 Kristoff Bonne ON1ARF
 /*
@@ -27,8 +28,10 @@
 // release info:
 // 14 jun. 2011: version 0.0.1. Initial release
 
+#define __USE_GNU
+
 #define VERSION "0.0.1"
-#define XRF2AMB 1
+#define DPL2AMB 1
 
 // change this to 1 for debugging
 #define DEBUG 0
@@ -51,6 +54,12 @@
 // posix threads
 #include "pthread.h"
 
+// change this to 1 for debugging
+#define DEBUG 0
+
+
+//// includes ////
+
 // needed for gettimeofdat (used with srandom)
 #include <sys/time.h>
 
@@ -62,15 +71,13 @@
 #include "dstk.h"
 
 // structures and data specific for cap2rpc
-#include "xrf2amb.h"
+#include "dpl2amb.h"
 
 // functions for multicasting
 #include "multicast.h"
 
-// dextra linking and heartbeat functions
-#include "dextra.h"
-
-
+// dplus linking and heartbeat functions
+#include "dplus.h"
 
 //////////////////////////////////////////////////////////////////////////
 // configuration part // // configuration part // // configuration part //
@@ -82,8 +89,7 @@ int default_d_portincr=1;
 
 int default_ipv4only=0;
 int default_ipv6only=0;
-
-int default_reflectorport=30001;
+int default_gatewayport=20001;
 
 // end configuration part. Do not change below unless you
 // know what you are doing
@@ -109,19 +115,20 @@ unsigned char receivebuffer[ETHERNETMTU];
 dstkheader_str * dstkheader;
 void * dstkdata;
 
+char * d_ipaddress;
+int d_port;
+int d_portincr;
 char * mycall=NULL;
-char * reflectorhost=NULL;
-
-
+char * gatewayin=NULL;
+char gateway[6];
+char * gatewayhost=NULL;
 
 // outgoing udp stream
 int sock_out;
 struct sockaddr_in6 MulticastOutAddr;
-char * d_ipaddress;
-int d_port; int d_portincr;
 
 // posix threads
-pthread_t thr_dextraheartbeat;
+pthread_t thr_onesecond;
 
 // headers
 int packetsequence;
@@ -132,9 +139,16 @@ int ret;
 int found;
 int timeouts;
 int calllen;
+int gatewaylen;
 int streamloop;
 int paramloop;
+int ok;
+
+// vars dealing with modules
 char module_c; int module_i;
+int gatewayrpt;
+
+char * texttoprint;
 
 // time structures: used with srandom
 struct timeval now;
@@ -150,7 +164,7 @@ int ipv6only;
 // information about modules and streams
 int modactive[3];
 
-// as a reflector can have multiple streams active at the
+// as a gateway can have multiple streams active at the
 // same time, even multiple streams on the same module, we just cache up to
 // MAXSTREAMACTIVE active streams
 // Even streams on modules we are not subscribed are cached to avoid wrong errormessages
@@ -175,6 +189,7 @@ struct dstar_dv_rf_header * this_dv_rfhead;
 struct dstar_dv_data * this_dv_data;
 int this_streamid;
 uint32_t this_type;
+char * this_gatewaycallsign;
 
 // ////// data definition done ///
 
@@ -184,17 +199,22 @@ uint32_t this_type;
 global.outsock=0;
 global.verboselevel=0;
 
-global.destport=default_reflectorport;
+global.destport=default_gatewayport;
+
 
 // init other vars
 modactive[0]=1; modactive[1]=1; modactive[2]=1;
 ipv4only=default_ipv4only; ipv6only=default_ipv6only;
-d_ipaddress=default_d_ipaddress; d_port=default_d_port; d_portincr=default_d_portincr;
+d_port=default_d_port; d_ipaddress=default_d_ipaddress;
+d_portincr=default_d_portincr;
 
+texttoprint=strndup("RPT1=        ,RPT2=        ,YOUR=        ,MY=        /    ",58);
 
+for (streamloop=0; streamloop<MAXSTREAMACTIVE; streamloop++) {
+	global.stream_active[streamloop]=0;
+}; // end for
+global.heartbeat_timeout=0;
 
-// cli option parsing
-// Usage: xrf2amb [-v] [ [-4] || [-6] ]  [-di ipaddress] [-dp port] [-dpi portincrease] [-rp reflectorport] MYCALL reflectorhost
 
 for (paramloop=1;paramloop<argc;paramloop++) {
 	char * thisarg=argv[paramloop];
@@ -205,7 +225,7 @@ for (paramloop=1;paramloop<argc;paramloop++) {
 		exit(0);
 	} else if (strcmp(thisarg,"-h") == 0) {
 		// -h = help
-		help(argv[0]);
+ 		help(argv[0]);
 		exit(0);
 	} else if (strcmp(thisarg,"-v") == 0) {
 		// -v = verbose
@@ -241,11 +261,13 @@ for (paramloop=1;paramloop<argc;paramloop++) {
 			global.destport=atoi(argv[paramloop]);
 		}; // end if
 	} else {
-		// last parameters, first the MYCALL, then reflectorhostname
+		// last parameters, first the MYCALL, then gatewayhostname
 		if (!(mycall)) {
 			mycall=argv[paramloop];
-		} else if (!(reflectorhost)) {
-			reflectorhost=argv[paramloop];
+		} else if (!(gatewayin)) {
+			gatewayin=argv[paramloop];
+		} else if (!(gatewayhost)) {
+			gatewayhost=argv[paramloop];
 		} else {
 			fprintf(stderr,"Warning: Argument to much: %s\n",argv[paramloop]);
 		}; // end if
@@ -257,13 +279,30 @@ for (paramloop=1;paramloop<argc;paramloop++) {
 // sanity checks
 
 // sufficient parameters
-// we should have at least 2 parameters: mycall and reflectorhost
-if ((!(mycall)) || (!(reflectorhost))) {
+// we should have at least 2 parameters: mycall and gatewayhost
+if ((mycall == NULL) || (gateway == NULL) || (gatewayhost == NULL)) {
 	fprintf(stderr,"Error: Unsufficient parameters! \n");
 	usage(argv[0]);
 	exit(-1);
 }; // end if
 
+
+// copy gatewayin to gateway, maximum 6 character, fill in with spaces
+gatewaylen=strlen(gatewayin);
+
+if (gatewaylen > 6) {
+	gatewaylen=6;
+}; // end if
+
+if (gatewaylen < 3) {
+	fprintf(stderr,"Error: Remote gateway should be at least 3 characters! \n");
+	usage(argv[0]);
+	exit(-1);
+}; // end if
+
+// fill all spaces
+memset(gateway,' ',6);
+memcpy(gateway,gatewayin,gatewaylen);
 
 calllen=strlen(mycall);
 if (calllen > 6) {
@@ -271,7 +310,7 @@ if (calllen > 6) {
 }; // end if
 
 if (calllen < 3) {
-	fprintf(stderr,"Error: Call should be at least 3 characters! \n");
+	fprintf(stderr,"Error: MYCALL should be at least 3 characters! \n");
 	usage(argv[0]);
 	exit(-1);
 }; // end if
@@ -287,10 +326,9 @@ if ((memchr(mycall,'/',6) != NULL)) {
 memset(global.mycall,' ',6);
 memcpy(global.mycall,mycall,calllen);
 
-
 // sanity checks: UDP port should be between 1 and 65535
 if ((global.destport<1)  || (global.destport > 65535)) {
-	fprintf(stderr,"Error: remote reflector UDP port should be between 1 and 65535\n");
+	fprintf(stderr,"Error: remote gateway UDP port should be between 1 and 65535\n");
 	usage(argv[0]);
 	exit(-1);
 }; // end if
@@ -300,7 +338,6 @@ if ((d_port<1)  || (d_port > 65535)) {
 	usage(argv[0]);
 	exit(-1);
 }; // end if
-
 
 // sanity check: ipv4only and ipv6only
 if ((ipv4only) && (ipv6only)) {
@@ -313,10 +350,6 @@ if ((ipv4only) && (ipv6only)) {
 
 
 // init vars and buffers
-for (streamloop=0; streamloop<MAXSTREAMACTIVE; streamloop++) {
-	global.stream_active[streamloop]=0;
-}; // end for
-
 dstkheader = (dstkheader_str *) sendbuffer;
 dstkdata = (void *) sendbuffer + sizeof(dstkheader_str);
 
@@ -325,10 +358,10 @@ memset(dstkheader,0,sizeof(dstkheader_str));
 
 // fill in fixed parts
 dstkheader->version=1;
-// only one single subframe in a DTAK frame: set next-header to 0
+// only one single subframe in a DSTK frame: set next-header to 0
 dstkheader->flags=0 | DSTK_FLG_LAST;
 
-dstkheader->origin=htons(ORIGIN_CNF_DEX);
+dstkheader->origin=htons(ORIGIN_CNF_DPL);
 
 // streamid is random
 gettimeofday(&now,&tz);
@@ -355,7 +388,7 @@ global.outsock=sock_out;
 // packets are send to multicast address, set UDP port
 MulticastOutAddr.sin6_family = AF_INET6; 
 MulticastOutAddr.sin6_scope_id = 1;
-// do not fill in port yet
+MulticastOutAddr.sin6_port = htons((unsigned short int) d_port);
 
 
 ret=inet_pton(AF_INET6,d_ipaddress,(void *)&MulticastOutAddr.sin6_addr);
@@ -364,9 +397,9 @@ if (ret != 1) {
 	exit(1);
 }; // end if
 
-// dextra related stuff
+// dplus related stuff
 
-// DNS lookup for remote Dextra repeater/reflector
+// DNS lookup for remote dplus gateway/reflector
 
 // clear hint
 memset(&hint,0,sizeof(hint));
@@ -374,7 +407,7 @@ memset(&hint,0,sizeof(hint));
 hint.ai_socktype = SOCK_DGRAM;
 
 // resolve hostname, use function "getaddrinfo"
-// set address family in hint if ipv4only or ipv6ony
+// set address family in hint if ipv4only or ipv6only
 if (ipv4only) {
 	hint.ai_family = AF_INET;
 } else if (ipv6only) {
@@ -384,7 +417,7 @@ if (ipv4only) {
 }; // end if
 
 // do DNS-query, use getaddrinfo for both ipv4 and ipv6 support
-ret=getaddrinfo(reflectorhost, NULL, &hint, &info);
+ret=getaddrinfo(gatewayhost, NULL, &hint, &info);
 
 if (ret != 0) {
 	fprintf(stderr,"Error: resolving hostname: (%s)\n",gai_strerror(ret));
@@ -416,20 +449,23 @@ if ((info->ai_next != NULL) || global.verboselevel >= 1) {
 	if (info->ai_next != NULL) {
 		fprintf(stderr,"Warning. getaddrinfo returned multiple entries. Using %s\n",ipaddrtxt);
 	} else {
-		fprintf(stderr,"Connecting to dextra gateway %s\n",ipaddrtxt);
+		fprintf(stderr,"Connecting to dplus %s\n",ipaddrtxt);
 	}; // end if
 }; // end if
 
 // store address info in global structure
 global.ai_addr=(struct sockaddr_in6 *) info->ai_addr;
 
+// set udp port
+global.ai_addr->sin6_port=htons((unsigned short int) global.destport);
 
-// start dextra session
-ret=dextralink(sock_out, mycall, calllen, (struct sockaddr_in6 *) info->ai_addr, global.destport);
+
+// start dplus session
+ret=dpluslink(sock_out, mycall, calllen, (struct sockaddr_in6 *) info->ai_addr, global.destport);
 
 
-// starts thread that sends a heartbeat every 6 seconds
-pthread_create(&thr_dextraheartbeat,NULL,funct_dextraheartbeat, (void *) &global);
+// starts thread that for one cache timeout
+pthread_create(&thr_onesecond,NULL,funct_dplusonesecond, (void *) &global);
 
 
 
@@ -481,37 +517,117 @@ while (forever) {
 	if (recvlen < 0) {
 		// no data to be received.
 		// this should not happen as the "select" told us there is data waiting for us
+
+		// go to next packet
+		continue;
 	}; // end if
 
-	// we have received a frame. Check size.
-	// len=9 = incoming heartbeat: ignore
-	// len=29 or 32: DV frame
-	// len=54: DV "CFG" frame
+	if (recvlen < 2) {
+		// dplus message start with a length indication of 2 octets. Check if we have at
+		// least 2 octets received
 
-	if (recvlen == 9) {
-		// heartheat: ignore
-if (global.verboselevel >= 3) {
-	fprintf(stderr,"H ");
-}; // end if
+		if (global.verboselevel >= 1) {
+			fprintf(stderr,"Error: packet size to small, we should receive at least 2 octets, got %d\n",recvlen);
+		}; // end if
+
+		// go to next packet
 		continue;
-	} else if (recvlen == 27) {
+	}; // end if
+
+	// dplus messages always beging with a 2 octet length/flags indication
+	// skip these two bytes
+	this_dsstrhead1 = (struct dstar_str_header1 *) (receivebuffer + sizeof(struct dplus_size_header));
+
+	this_dsstrhead2 = (struct dstar_str_header2 *) (receivebuffer + sizeof(struct dplus_size_header) + sizeof(struct dstar_str_header1));
+
+
+	// we have received a frame. Check size.
+	// len=6 = incoming heartbeat: reply with heartbeat ourselfs
+	// len=10 = end of stream marker. Ignore
+	// len=29 or 32: DV frame
+	// len=58: DV "CFG" frame
+
+	// other size:
+	// possible gwmsg, check for "gwmsg=" in first 6 characters of text string
+
+	if (recvlen == sizeof(dplus_heartbeat)) {
+		// heartheat
+		if (global.verboselevel >= 3) {
+			fprintf(stderr,"H ");
+		}; // end if
+
+		ret=sendto(sock_out,dplus_heartbeat,sizeof(dplus_heartbeat),0,(struct sockaddr *) global.ai_addr, sizeof(struct sockaddr_in6));
+
+		// rearm heartbeat timeout
+		global.heartbeat_timeout=10;
+
+		// next packet
+		continue;
+	} else if (recvlen == 10) {
+		// end of file marker. Ignore
+		continue;
+	} else if (recvlen == 29) {
 		this_type=TYPE_AMB_DV;
-	} else if (recvlen == 30) {
-		this_type=TYPE_AMB_DV;
-	} else if (recvlen == 56) {
+	} else if (recvlen == 32) {
+		this_type=TYPE_AMB_DVE;
+	} else if (recvlen == 58) {
 		this_type=TYPE_AMB_CFG;
+	} else if ((recvlen > 10 ) && (memcmp("\x10\x00",(receivebuffer+sizeof(struct dplus_size_header)),2)==0) && (memcmp("gwmsg=",receivebuffer + sizeof(struct dplus_size_header) + sizeof(struct dplus_control_item),6) == 0)) {
+			// other stuff (no fixed length, just check size for sanity checks
+			// "gwmsg=" messages:
+			// begins with size (2 octets), then 0x10 0x00 (2 octets control-
+			// item) and then text "gwmsg="
+
+		struct dplus_size_header *p_pcksize;
+		struct dplus_control_item *p_controlitem;
+		int msgsize;
+		char *msgtxt;
+
+		p_pcksize= (struct dplus_size_header *) receivebuffer;
+		p_controlitem= (struct dplus_control_item *) receivebuffer + sizeof(struct dplus_size_header);
+
+		// determine size: size_header is network order and top 3 bits of size2 contains bits so strip there
+		msgsize = ntohs(p_pcksize->size) & 0x1fff;
+
+		msgtxt = strndup(receivebuffer+4,msgsize);
+
+		if (global.verboselevel >= 2) {
+			fprintf(stderr,"Message: gateway message is %s\n",msgtxt);
+		}; // end if
+
+		// now send DSTK frame
+
+		// set packetsequence
+		dstkheader->seq1=htons(packetsequence);
+		packetsequence++;
+
+		// stream2 not used. Set to 0
+		dstkheader->streamid2=0;
+
+		// set type
+		dstkheader->type=htonl(TYPE_OTH_DPLGWMSG);
+
+		// set size
+		dstkheader->size=htons(msgsize);
+	
+		// send packet, including the "gwmsg=" text
+		ret=sendto(sock_out,&receivebuffer+4,msgsize,0,(struct sockaddr *) &MulticastOutAddr, sizeof(MulticastOutAddr));
+
+		// done, clear memory and go to next packet
+		free(msgtxt);
+		continue;
 	} else {
+
 		if (global.verboselevel >= 2) {
 			fprintf(stderr,"Error: packet has invalid size: %d\n",recvlen);
 		}; // end if
 		continue;
 	}; // end else - elsif ... - if
-		
-		
-	this_dsstrhead1 = (struct dstar_str_header1 *) (receivebuffer);
-	this_dsstrhead2 = (struct dstar_str_header2 *) (receivebuffer + sizeof(struct dstar_str_header1));
+	
 
+	// finished parsing packet header. Now process the packets
 
+	// continue for "AMBE" data
 	// First 4 octets should be 'DSTR'
 	if (strncmp("DSVT", this_dsstrhead1->dstarstr_id,4) != 0) {
 		// not a DSTAR packet
@@ -528,19 +644,108 @@ if (global.verboselevel >= 3) {
 			fprintf(stderr,"Error: packet is not a voice packet\n");
 			continue;
 		}; // end if
+
 	}; // end if
 
 	// get streamid;
 	this_streamid = this_dsstrhead2->dstarstr_streamid;
 
 	// config-frame (first frame of stream);
-	if (recvlen == 56) {
+	if (recvlen == 58) {
 		int modulesubscribed;
 
-		this_dv_rfhead=(struct dstar_dv_rf_header *) (receivebuffer + sizeof(struct dstar_str_header1) + sizeof(struct dstar_str_header2));
+		this_dv_rfhead=(struct dstar_dv_rf_header *) (receivebuffer + sizeof(struct dplus_size_header) + sizeof(struct dstar_str_header1) + sizeof(struct dstar_str_header2));
 
-		// module is last character of RPT2 field
-		module_c=this_dv_rfhead->rpt2_callsign[7];
+		// LOCALR = callsign LOCAL REPEATER
+		// REFLEC = callsign REFLECTOR / REMOTE GATEWAY
+		// ORIGIN = callsign REPEATER where STREAM ORIGINATES
+		// M = module (A, B or C), X can be anything (in 8th position of callsign, only in DVAP)
+		// DVAPHS = USER CALLSIGN (for dvap) or HOTSPOT CALLSIGN
+
+		// A: When linking to a repeater/gateway:
+		// A1/ local user from RF to gateway: rpt1 = "LOCALR M", rpt2 = "LOCALR G"
+		// A2/ incoming stream from remote repeater: rpt1 = "REFLEC M", rpr2 = "LOCALR M" -> see 1 below
+		// A3/ incoming stream from remote dongle: rpt1 = "REFLEC M", rpt2 = "LOCALR M"
+		// A4/ incoming stream from remote DVAP/hotspot: rpt1 = "DVAPHS X", rpt2 = "LOCALR M"
+
+		// B/ When linking to a reflector: Five different senarios:
+		// B1/ normal user: rpt1 = "REFLEC M", rpt2 = "LOCALR M"
+		// B2/ dongle user to repeater: rpt1 = "LOCALR G", rpt2 = "REFLEC M"
+		// B3/ dongle user directly to reflector: rpt1 = "REFLEC G", rpt2 = "REFLEC M"
+		// B4/ dvap/hotspot user: rpt1 = "DVAPHS X", rpt2= "REFLEC M"
+		// B5/ broadcast message: rpt1 = "LOCALR G", rpt2 = "REFLEC M"
+
+
+		// find where the gateway repeater is located
+		gatewayrpt=0;
+
+		ok=1;
+
+		// verify rpt1
+
+		// module should be 'A' to 'C'
+		module_c=this_dv_rfhead->rpt1_callsign[7];
+		if ((strncmp(&module_c,"A",1) != 0) && (strncmp(&module_c,"B",1) != 0) && (strncmp(&module_c,"C",1) != 0)) {
+			ok=0;
+		}; // end if 
+
+		// if this is correct, verify callsign
+		if (ok) {
+		// rpt1 should contain callsign we are looking for
+			if (memcmp(gateway,this_dv_rfhead->rpt1_callsign,6) != 0) {
+				ok=0;
+			}; // end if
+		}; // end if
+
+		if (ok) {
+			this_gatewaycallsign=this_dv_rfhead->rpt1_callsign;
+			this_type |= TYPEMASK_FLG_AMB_CNF_RPT1;
+			gatewayrpt=1;
+		} else {
+			// verify rpt2
+
+			ok=1;
+
+			module_c=this_dv_rfhead->rpt2_callsign[7];
+			if ((strncmp(&module_c,"A",1) != 0) && (strncmp(&module_c,"B",1) != 0) && (strncmp(&module_c,"C",1) != 0)) {
+				ok=0;
+			}; // end if 
+
+			// if this is correct, verify callsign
+			if (ok) {
+			// rpt2 should contain callsign we are looking for
+				if (memcmp(gateway,this_dv_rfhead->rpt2_callsign,6) != 0) {
+					ok=0;
+				}; // end if
+			}; // end if
+
+
+			if (ok) {
+				this_gatewaycallsign=this_dv_rfhead->rpt2_callsign;
+				gatewayrpt=2;
+			};
+		};
+
+
+
+		if (global.verboselevel >= 2) {
+			memcpy(&texttoprint[5],&this_dv_rfhead->rpt1_callsign,8);
+			memcpy(&texttoprint[19],&this_dv_rfhead->rpt2_callsign,8);
+			memcpy(&texttoprint[33],&this_dv_rfhead->your_callsign,8);
+			memcpy(&texttoprint[45],&this_dv_rfhead->my_callsign,8);
+			memcpy(&texttoprint[54],&this_dv_rfhead->my_callsign_ext,4);
+			fprintf(stderr,"RPT: %s, Reflector-RPT = %d\n",texttoprint,gatewayrpt);
+		}; // end if
+
+
+		if (gatewayrpt == 0) {
+			if (global.verboselevel >= 1) {
+				fprintf(stderr,"Error: Cannot determine gateway for packet! \n");
+			}; // end if
+
+			// skip packet.
+			continue;
+		}; // end if
 
 		// sanity check
 		module_i=-1;
@@ -552,13 +757,16 @@ if (global.verboselevel >= 3) {
 			module_i=2; module_c='C';
 		}; // end elsif - elsif - if
 
-		// valid module?
+		// valid module? 
 		if  (module_i == -1) {
 			if (global.verboselevel >= 1) {
-				fprintf(stderr,"Error: Invalid module: %c\n",module_c);
+				if (texttoprint) {
+					fprintf(stderr,"Error: Invalid module %c\n",module_c);
+				}; // end if
 				continue;
 			}; // end if
 		}; // end if
+
 
 		if (global.verboselevel >= 2) {
 			fprintf(stderr,"NS%c%04X ",module_c,this_streamid);
@@ -618,7 +826,7 @@ if (global.verboselevel >= 3) {
 		// recvlen = 29 or 32: DV data frame
 		int streamidsubscribed;
 
-		this_dv_data=(struct dstar_dv_data *) (receivebuffer + sizeof(struct dstar_str_header1) + sizeof(struct dstar_str_header2));
+		this_dv_data=(struct dstar_dv_data *) (receivebuffer + sizeof(struct dplus_size_header) + sizeof(struct dstar_str_header1) + sizeof(struct dstar_str_header2));
 
 		// search for streamid in list
 		found=0; streamidsubscribed=0;
@@ -660,19 +868,22 @@ fprintf(stderr,"NOTSUB%04x ",this_streamid);
 	dstkheader->seq1=htons(packetsequence);
 	packetsequence++;
 
-	// copy dvdata from DV-data to end, include dstar stream headers
-	memcpy(dstkdata,receivebuffer,recvlen);
+	// copy data from DV-data to end (hence no STREAM header)
+	// i.e. do not copy first 8 octets
+	// also do not copy the 2 length/flags octets
+	// so do not copy the first 10 octets in total
+	memcpy(dstkdata,receivebuffer+sizeof(struct dplus_size_header),recvlen-sizeof(struct dplus_size_header));
 
 	// copy streamid of incoming AMBE-stream to streamid2 of DSTK-stream
 	dstkheader->streamid2=this_streamid;
+
+	// set size
+	dstkheader->size=htons(recvlen-sizeof(struct dplus_size_header));
 
 	// set type
 	// also set "AMBE STREAM header 1" flag (see dstk.h for more info)
 	this_type |= TYPEMASK_FLG_AMB_STRHDR1;
 	dstkheader->type=htonl(this_type);
-
-	// set size
-	dstkheader->size=htons(recvlen);
 
 	if (global.verboselevel >= 2) {
 		fprintf(stderr,"%c",module_c);
@@ -682,7 +893,7 @@ fprintf(stderr,"NOTSUB%04x ",this_streamid);
 	MulticastOutAddr.sin6_port = htons((unsigned short int) d_port + d_portincr * module_i);
 
 	// send DSTAR frame
-	ret=sendto(sock_out,dstkheader,recvlen+sizeof(dstkheader_str),0,(struct sockaddr *) &MulticastOutAddr, sizeof(MulticastOutAddr));
+	ret=sendto(sock_out,dstkheader,recvlen-sizeof(struct dplus_size_header)+sizeof(dstkheader_str),0,(struct sockaddr *) &MulticastOutAddr, sizeof(MulticastOutAddr));
 
 	if (ret < 0) {
 		// error
