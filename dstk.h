@@ -296,7 +296,7 @@ struct dstar_dv_rf_header {
 
 
 struct dplus_size_header {
-	// dplus size header: 2 octets, network-order! top3 bits contain flags
+	// dplus size header: 2 octets, i386-order, top3 bits contain flags
 	uint16_t size;
 }; // end 
 

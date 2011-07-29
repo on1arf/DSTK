@@ -30,7 +30,7 @@ void usage (char * prog) {
 #endif
 
 #ifdef XRF2AMB
-	fprintf(stderr,"Usage: %s [-v] [-4] [-6]  [-di ipaddress] [-dp port] [-dpi portincrease] [-rp port] MYCALL gateway gatewayhost\n",prog);
+	fprintf(stderr,"Usage: %s [-v] [-4] [-6]  [-di ipaddress] [-dp port] [-dpi portincrease] [-rp port] MYCALL reflector\n",prog);
 	fprintf(stderr,"Usage: -V\n");
 	fprintf(stderr,"Usage: -h\n");
 	return;

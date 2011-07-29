@@ -150,6 +150,19 @@ int gatewayrpt;
 
 char * texttoprint;
 
+// vars dealing with messages received from dplus
+struct dplus_size_header *p_pck;
+int pktsize;
+int pkttype;
+struct dplus_control_item *p_cntrlitem;
+int cntrlitem;
+char *msgtxt;
+
+// vars to determine if additional information need to be printed
+int print_NS;
+int print_ES;
+int print_AK;
+
 // time structures: used with srandom
 struct timeval now;
 struct timezone tz;
@@ -208,6 +221,7 @@ ipv4only=default_ipv4only; ipv6only=default_ipv6only;
 d_port=default_d_port; d_ipaddress=default_d_ipaddress;
 d_portincr=default_d_portincr;
 
+// init text, no \n at the end.
 texttoprint=strndup("RPT1=        ,RPT2=        ,YOUR=        ,MY=        /    ",58);
 
 for (streamloop=0; streamloop<MAXSTREAMACTIVE; streamloop++) {
@@ -375,6 +389,10 @@ dstkheader->streamid1=random();
 dstkheader->seq2=0;
 
 
+print_NS=0;
+print_ES=0;
+print_AK=0;
+
 // /// open socket for outgoing UDP multicast
 sock_out=open_for_multicast_out(global.verboselevel);
 
@@ -534,23 +552,49 @@ while (forever) {
 		continue;
 	}; // end if
 
-	// dplus messages always beging with a 2 octet length/flags indication
-	// skip these two bytes
+
+	// determine size and type.
+	// type is contained in 3 most significant bits, size in remaining 13 bits
+
+	p_pck= (struct dplus_size_header *) receivebuffer;
+
+	// make code architecture independent
+	// pksize and pkttype is in i386 format (LSB).
+	if (ntohs(0x0102) != 0x0102) {
+		// In that case, just copy data without conversion
+		pktsize = p_pck->size & 0x1fff;
+		pkttype = (p_pck->size & 0xe000) >> 13;
+	} else {
+		// if integer format is MSB
+		pktsize = ntohs(p_pck->size) & 0x1fff;
+		pkttype = (ntohs(p_pck->size) & 0xe000) >> 13;
+	}; // end else - if
+
+	// control-item. Only usefull for type DATA2
+	if (pkttype == DVD_TYPE_DATA2) {
+		p_cntrlitem = (struct dplus_control_item *) (receivebuffer + sizeof(struct dplus_size_header));
+		cntrlitem = p_cntrlitem->controlitem;
+	}; // end if
+
+	// dplus messages always begins with a 2 octet length/flags indication
+	// pointers after size-info and after dstart header
 	this_dsstrhead1 = (struct dstar_str_header1 *) (receivebuffer + sizeof(struct dplus_size_header));
 
 	this_dsstrhead2 = (struct dstar_str_header2 *) (receivebuffer + sizeof(struct dplus_size_header) + sizeof(struct dstar_str_header1));
 
 
 	// we have received a frame. Check size.
-	// len=6 = incoming heartbeat: reply with heartbeat ourselfs
+	// len=3 = incoming heartbeat: reply with heartbeat ourselfs (type = DVD_TYPE_ACK)
 	// len=10 = end of stream marker. Ignore
-	// len=29 or 32: DV frame
-	// len=58: DV "CFG" frame
+	// len=29 or 32: DV frame (type = DVD_TYPE_DATA0)
+	// len=58: DV "CFG" frame (type = DVD_TYPE_DATA0)
 
-	// other size:
-	// possible gwmsg, check for "gwmsg=" in first 6 characters of text string
+	// variable size:
+	// type DATA2, Control-Item 0x0003, size = 24 (Status/time: twice (callsign gateway + S) + two 16bit counters)
+	// type DATA2, Control-Item 0x0010, size is variable, gateway message
+	// also check for "gwmsg=" in first 6 characters of text string
 
-	if (recvlen == sizeof(dplus_heartbeat)) {
+	if ((pkttype == DVD_TYPE_ACK) && (recvlen == sizeof(dplus_heartbeat))) {
 		// heartheat
 		if (global.verboselevel >= 3) {
 			fprintf(stderr,"H ");
@@ -566,36 +610,26 @@ while (forever) {
 	} else if (recvlen == 10) {
 		// end of file marker. Ignore
 		continue;
-	} else if (recvlen == 29) {
+	} else if ((pkttype == DVD_TYPE_DATA0) && (recvlen == 29)) {
 		this_type=TYPE_AMB_DV;
-	} else if (recvlen == 32) {
+	} else if ((pkttype == DVD_TYPE_DATA0) && (recvlen == 32)) {
 		this_type=TYPE_AMB_DVE;
-	} else if (recvlen == 58) {
+	} else if ((pkttype == DVD_TYPE_DATA0) && (recvlen == 58)) {
 		this_type=TYPE_AMB_CFG;
-	} else if ((recvlen > 10 ) && (memcmp("\x10\x00",(receivebuffer+sizeof(struct dplus_size_header)),2)==0) && (memcmp("gwmsg=",receivebuffer + sizeof(struct dplus_size_header) + sizeof(struct dplus_control_item),6) == 0)) {
-			// other stuff (no fixed length, just check size for sanity checks
-			// "gwmsg=" messages:
-			// begins with size (2 octets), then 0x10 0x00 (2 octets control-
-			// item) and then text "gwmsg="
+	} else if ((pkttype == DVD_TYPE_DATA2) && (cntrlitem == DVD_CNTRLITEM_GWMSG) && (pktsize > 6) && (memcmp("gwmsg=",receivebuffer + sizeof(struct dplus_size_header) + sizeof(struct dplus_control_item),6) == 0)) {
+		// no fixed length, just check size (minimal 6 octets) for sanity checks)
+		// "gwmsg=" messages:
+		// begins with type = DATA2, control-item = 0x0010, text starts with "gwmsg="
 
-		struct dplus_size_header *p_pcksize;
-		struct dplus_control_item *p_controlitem;
-		int msgsize;
-		char *msgtxt;
-
-		p_pcksize= (struct dplus_size_header *) receivebuffer;
-		p_controlitem= (struct dplus_control_item *) receivebuffer + sizeof(struct dplus_size_header);
-
-		// determine size: size_header is network order and top 3 bits of size2 contains bits so strip there
-		msgsize = ntohs(p_pcksize->size) & 0x1fff;
-
-		msgtxt = strndup(receivebuffer+4,msgsize);
+		msgtxt = strndup( (char *) receivebuffer + sizeof(struct dplus_size_header) + sizeof(struct dplus_control_item) ,pktsize);
 
 		if (global.verboselevel >= 2) {
-			fprintf(stderr,"Message: gateway message is %s\n",msgtxt);
+			// start printing from 7th character (skip "gwmsg=")
+			fprintf(stderr,"Info: Gateway message is %s\n",&msgtxt[6]);
 		}; // end if
 
-		// now send DSTK frame
+
+		// send this packet in a multicast DSTK frame
 
 		// set packetsequence
 		dstkheader->seq1=htons(packetsequence);
@@ -608,13 +642,16 @@ while (forever) {
 		dstkheader->type=htonl(TYPE_OTH_DPLGWMSG);
 
 		// set size
-		dstkheader->size=htons(msgsize);
+		dstkheader->size=htons(pktsize);
 	
 		// send packet, including the "gwmsg=" text
-		ret=sendto(sock_out,&receivebuffer+4,msgsize,0,(struct sockaddr *) &MulticastOutAddr, sizeof(MulticastOutAddr));
+		ret=sendto(sock_out,&receivebuffer+4,pktsize,0,(struct sockaddr *) &MulticastOutAddr, sizeof(MulticastOutAddr));
 
 		// done, clear memory and go to next packet
 		free(msgtxt);
+		continue;
+	} else if ((pkttype == DVD_TYPE_DATA2) && (cntrlitem == DVD_CNTRLITEM_STATTIME)) {
+		// Status / time messages : ignore
 		continue;
 	} else {
 
@@ -734,7 +771,7 @@ while (forever) {
 			memcpy(&texttoprint[33],&this_dv_rfhead->your_callsign,8);
 			memcpy(&texttoprint[45],&this_dv_rfhead->my_callsign,8);
 			memcpy(&texttoprint[54],&this_dv_rfhead->my_callsign_ext,4);
-			fprintf(stderr,"RPT: %s, Reflector-RPT = %d\n",texttoprint,gatewayrpt);
+			fprintf(stderr,"RPT: %s, Reflector-RPT = %d ",texttoprint,gatewayrpt);
 		}; // end if
 
 
@@ -768,9 +805,7 @@ while (forever) {
 		}; // end if
 
 
-		if (global.verboselevel >= 2) {
-			fprintf(stderr,"NS%c%04X ",module_c,this_streamid);
-		}; // end if
+		print_NS=1;
 
 		if (! (modactive[module_i])) {
 			if (global.verboselevel >= 1) {
@@ -793,10 +828,7 @@ while (forever) {
 		}; // end 
 		
 		if (found) {
-			if (global.verboselevel >= 2) {
-//				fprintf(stderr,"Warning: stream already known: module:%c streamid:%04X\n",module_c,this_streamid);
-				fprintf(stderr,"AK%c%04X ",module_c,this_streamid);
-			}; // end if
+			print_AK=1;
 		} else {
 			// find a place to start this streamid
 			found=0;
@@ -844,7 +876,7 @@ while (forever) {
 				// is it the last packet of a stream?
 				if (this_dv_data->dv_seqnr & 0x40) {
 					// clear stream in cache
-fprintf(stderr,"ES%04X\n",this_streamid);
+					print_ES=1;
 					global.stream_active[streamloop]=0;
 				} else {
 					// rearm timeout
@@ -886,8 +918,28 @@ fprintf(stderr,"NOTSUB%04x ",this_streamid);
 	dstkheader->type=htonl(this_type);
 
 	if (global.verboselevel >= 2) {
+
+		if (print_NS) {
+			fprintf(stderr,"NS%c%04X ",module_c,this_streamid);
+		}; // end if
+
+		if (print_ES) {
+			fprintf(stderr,"ES%c%04X ",module_c,this_streamid);
+		}; // end if
+
+		if (print_AK) {
+			fprintf(stderr,"AK%c%04X ",module_c,this_streamid);
+		}; // end if
+
 		fprintf(stderr,"%c",module_c);
+
+		if ((print_ES) || (print_NS) || (print_AK)) {
+			fprintf(stderr,"\n");
+		}; // end if
 	}; // end if
+
+	// reset prints
+	print_NS=0; print_ES=0; print_AK=0;
 
 	// fill in destination port
 	MulticastOutAddr.sin6_port = htons((unsigned short int) d_port + d_portincr * module_i);

@@ -6,20 +6,49 @@
 
 // dplus commands are based on DVdongle commands. The first two
 // octets contain the length (13 bits) + flags (3 bits) in
-// reverse order
+// network order
+
+// 
+// dplus_init:
+// size=5, type = 0 (set-control item)
+// Control Item Code = 0x0018 (start-stop commands)
+// parameter = 0x01 (start)
 unsigned char dplus_init[] = {0x05, 0x00, 0x18, 0x00, 0x01};
 
+// dplus link
+// size=27, type = 6 (Data Item 2)
+// Control Item code = 0x0004 (Hardware/Firmware control code)
 unsigned char dplus_link[] = {0x1C, 0xC0, 0x04, 0x00, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x44, 0x56, 0x30, 0x31, 0x39, 0x39, 0x39, 0x37};
 // octets 4 up to 11 contain callsign
 // octets 20 tp to 27 contain serialnumber of DVdongle (here set fixed
 // to DV019997).
 
-// link OK message: text (last 4 octets): OKRW
+// link OK message
+// size = 8, type = 6 (Data Item 2)
+// Control Item Code = 0x0004 (Hardware/Firmware control code)
+// parameter = "OKRW"
 unsigned char dplus_linkok[] = {0x08, 0xC0, 0x04, 0x00, 0x4F, 0x4B, 0x52, 0x57};
 
 
 unsigned char dplus_heartbeat[] = {0x03, 0x60, 0x00};
+// size = 3, type = 3 (Data Item Ack)
+// parameter = 0x00
 
+
+// data types for datatype
+#define DVD_TYPE_CNTRL_SET 0 // control item (TX)
+#define DVD_TYPE_CNTRL_REPLY 0 // control item (RX)
+#define DVD_TYPE_CNTRL_REQ 1 // control item (TX)
+#define DVD_TYPE_CNTRL_UNSOL 1 // Unsolicited control item (RX)
+#define DVD_TYPE_CNTRL_RANGE 2 // control item range (RX & TX)
+#define DVD_TYPE_ACK 3 // Data Item ACK
+#define DVD_TYPE_DATA0 4 // Data Item 0
+#define DVD_TYPE_DATA1 5 // Data Item 1
+#define DVD_TYPE_DATA2 6 // Data Item 2
+#define DVD_TYPE_DATA3 7 // Data Item 3
+
+#define DVD_CNTRLITEM_STATTIME 0x0003 // Status/time message
+#define DVD_CNTRLITEM_GWMSG 0x0010 // gateway message
 
 // dpluslink: init link to dplus gateway or reflector
 int dpluslink(int outsock, char * callsign, int calllen, struct sockaddr_in6 * serverAddress, int destport) {
