@@ -1,0 +1,61 @@
+Format description TYPE_RPC subframe structure
+----------------------------------------------
+
+
+This document described the format of the DSTK subframe
+structure containing TYPE_RPC data.
+
+
+* General overview
+
+A TYPE_RPC data stream is a DSTK substream that contains a copy
+of the data send from a i-com D-STAR repeater gatewayserver and
+a i-COM D-STAR repeater-controller. (hence its name "RPC" stream).
+
+It is the starting point of to process Digital Voice (DV) and Digital
+Data (DD) traffic passing over an i-com based D-STAR repeater.
+
+RPC-streams are created by the "cap2rpc" application which intercepts
+the traffic on the ethernet interface of the D-STAR gateway server
+facing the RPC (usually eth1).
+To achieve this, cap2rpc uses the "libpcap" library. cap2rpc is the
+only application of the DSTK application stack that needs
+root-priviledges.
+
+Other applications (like rpc2amb) subscribe to the RPC stream for
+further processing. 
+
+
+* structure
+
+In essence, it just contains a copy of the IP packet exchanged
+from the IP-layer upwards.
+
+A D-STAR RPC substream packet concists of a fixed lenght header,
+followed by a variable lenght data part.
+
+The structure of the header is as follows:
+- octets 0-15: IPv4 header
+- octets 16-23: UDP header
+
+- octets 24-33: the "D-STAR RPC header":
+-> octets 24-27: signature 'DSTR'
+-> octets 28-29: pkt_num
+-> octet 30: RS flag
+-> octet 31: PKT type
+-> octet 32-33: D-STAR data len
+
+See the file "include/dss_rpc.h" for more information
+
+
+
+* Flags:
+No flags are set on the TYPE_RPC streams. Even excluding the FLG_DIR
+(direction) flag.
+
+
+
+DSTK TYPE_RPC structure version 0.9.9, d.d. 11/Aug/2011
+
+73
+Kristoff - ON1ARF

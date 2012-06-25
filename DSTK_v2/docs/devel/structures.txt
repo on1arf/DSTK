@@ -1,0 +1,15 @@
+DSTK structures
+---------------
+
+
+The D-STAR Switching Matrix toolkit is designed as an open toolkit
+using publically documented structures.
+
+The following documents provide information about the particular
+structures:
+
+- structures_dstk.txt:
+General information about the DSTK superframe structure
+
+- structures_rpc.txt:
+Information about the TYPE_RPC frames

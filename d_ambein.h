@@ -270,6 +270,8 @@ fprintf(stderr,"type = %08X, after filter = %08X, should have %08X \n",ntohl(dst
 			// also determine reflector
 			reflector=0;
 
+printf("origin = %d \n",origin);
+
 			// this depends on where a stream has originated
 
 			// case 1: a stream originated from a RPC-stream (intercepted traffic

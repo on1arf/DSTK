@@ -1,22 +1,22 @@
 ALL: cap2rpc rpc2amb amb2pcm pcm2stdout xrf2amb dpl2amb
 
 
-cap2rpc: cap2rpc.c cap2rpc.h dstk.h multicast.h helpandusage.h
+cap2rpc: cap2rpc.c cap2rpc.h dstk.h multicast.h helpandusage.h Makefile
 	 gcc -Wall -lpcap -o cap2rpc cap2rpc.c
 
-rpc2amb: rpc2amb.c rpc2amb.h dstk.h multicast.h helpandusage.h
+rpc2amb: rpc2amb.c rpc2amb.h dstk.h multicast.h helpandusage.h Makefile
 	 gcc -Wall -lrt -o rpc2amb rpc2amb.c
 
-amb2pcm: amb2pcm.c amb2pcm.h dstk.h multicast.h helpandusage.h serialframe.h d_initdongle.h d_ambein.h d_serialsend.h d_serialreceive.h d_pcmout.h
+amb2pcm: amb2pcm.c amb2pcm.h dstk.h multicast.h helpandusage.h serialframe.h d_initdongle.h d_ambein.h d_serialsend.h d_serialreceive.h d_pcmout.h Makefile
 	gcc -Wall -lrt -o amb2pcm amb2pcm.c
 
-pcm2stdout: pcm2stdout.c pcm2stdout.h dstk.h multicast.h helpandusage.h
+pcm2stdout: pcm2stdout.c pcm2stdout.h dstk.h multicast.h helpandusage.h Makefile
 	gcc -Wall -lrt -o pcm2stdout pcm2stdout.c
 
-xrf2amb: xrf2amb.c xrf2amb.h dstk.h multicast.h helpandusage.h dextra.h
+xrf2amb: xrf2amb.c xrf2amb.h dstk.h multicast.h helpandusage.h dextra.h Makefile
 	gcc -Wall -lpthread -o xrf2amb xrf2amb.c
 
-dpl2amb: dpl2amb.c dpl2amb.h dstk.h multicast.h helpandusage.h dplus.h
+dpl2amb: dpl2amb.c dpl2amb.h dstk.h multicast.h helpandusage.h dplus.h Makefile
 	gcc -Wall -lpthread -o dpl2amb dpl2amb.c
 
 

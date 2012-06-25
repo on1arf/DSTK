@@ -1,0 +1,156 @@
+Format description DSTK superframe structure
+--------------------------------------------
+
+
+This document described the general format of the DSTK superframe
+structure.
+
+
+* General overview
+
+The D-STAR switching matrix toolkit is an application toolkit
+consisting of multiple applications that communicate with
+eachother via UDP multicast frames.
+These frames are called DSTK "superframes".
+
+Every DSTK superframe consists of one or more "DSTK subframe". A
+subframe carries one particular unit of information for a certain
+time-perdiode.
+Examples are 20 ms of PCM-enocded or AMBE voice, D-STAR routing
+information, slow-speed text or application status updates.
+
+Every DSTK subframe is preceded by a 20 octet "DSTK header" containing
+meta-information about the data inside the DSTK data part.
+
+
+* Some rules:
+
+- If a superframe contains multiple subframes, the information in these
+subframes must be related.
+
+An example of a valid DSTK superframe containing multiple subframes is
+- 20 ms of PCM audio, as part of an audio-stream.
+- D-STAR routing information ("MY", "UR", "RPT1", "RPT2", ...) of that
+audio-stream
+- slow-speed data information related to that particular audio-stream.
+
+- If a DSTK superframe contains multiple subframes, a "DSTK signature"
+is placed inbetween every subframe to help syncronisation.
+The DSTK signature is simply a 4 octet string containing the text
+DSTK.
+
+- An application that processes data from one format to another MUST
+copy all the DSTK subfields on which is does not act to the new
+stream.
+
+
+
+* DSTK Header structure
+
+This document describes the DSTK header, which is placed in front of
+every information unit carried in a DSTK subframe.
+The format of the data carried in the DSTK subframe is described in
+a seperate document per type of frame.
+
+
+The header of a DSTK superframe has a fixed length of 20 octets and
+is defined below.
+
+Additional information can also be found in the "include/dstk.h"
+header file.
+
+Fields containing numeric information of a size larger then 1 octet
+are format in the "IP network format". Use the "hton"  and "ntoh"
+functions to convert information from the architecture integer
+format to the correct network format.
+
+
+- octet 0: version (8 bits)
+Currently, only version 1 is defined.
+
+- octet 1: flags (8 bits)
+This contains frags concerning the DSTK superframe structure.
+Currently, only one flag is defined: "last" ("this subframe is
+last DSTK subframe of DSTK superframe")
+
+
+- octet 2-3: origin (16 bits)
+Identified the "origin" of a stream, i.e. an indication where
+a stream has originated before entering the Switching Matrix.
+Examples are "RPC" (repeater controller of a i-com based D-STAR
+repeater), "Conference/Dplus" (dplus reflector), "local file" and
+"analog feed: FM repeater".
+See the "include/dstk.h" header file for a full list.
+
+The goal of the origin identification is to allow enforcing
+policy-descisions on exporting streams once a stream leaves the D-STAR
+Switching Matrix.
+For that reason, the origin of a stream MAY NOT change during processing
+in the switching-matrix, even when information is converted from one
+format into another.
+
+
+- octet 4-7: type (32 bits)
+Identifies the type or format of the information carried in the
+DSTK subframe.
+Examples are "PCM voice", "AMBE voice", "DTMF information" and
+"application heartbeat message".
+
+As information can be converted from one format to another by
+processes in the D-STAR switching matrix system, it is possible
+that the "type" identification of a stream changes while
+traveling through the DSTK.
+
+DSTK type information also contains flags defining certain
+features of the data contained in the DSTK subframe.
+
+See the "include/dstk.h" header file for a full list of types
+and options.
+
+
+- octet 8-11:  sequence (32 bits)
+Sequencing information of a DSTK frame in a DSTK stream.
+
+This information can be addresses as one 32 bit field or two
+concequent 16 bit fields.
+
+The DSTK specification do not define how the DSTK subframe information
+needs to be formatted.
+Examples of sequence information are:
+- a sequencial numbering of frames in a stream
+- absolute time-information of frames in a stream.
+The latter allows for syncronisation of multiple DSTK streams, even
+when carried in seperate DSTK superframes.
+
+For that reason, the DSTK sequence field is defined both a one single
+32 bit field and as two 16 bit fields.
+
+
+- octets 12-13: streamid1 (16 bits)
+- octets 14-15: streamid2 (16 bits)
+Octets 12 to 15 of the DSTK header is defined as two 16-bit streamid
+fields.
+This allows the streamid fields to provide information about
+relationships between different streams:
+- "parent-child relationship" when converting a stream from one format
+into another
+- "brother relationship" between multiple streams origination from
+a common parent stream.
+
+- octets 16-17: size (16 bits)
+Size of the DSTK subframe.
+
+
+- octet 18: undefined
+- octet 19: undefined
+
+These fields of the DSTK header is currently undefined and reserved for
+future use.
+
+
+
+
+DSTK structure Version 0.9.0, d.d. 11/Aug/2011
+
+73
+Kristoff - ON1ARF

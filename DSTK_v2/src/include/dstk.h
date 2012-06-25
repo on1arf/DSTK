@@ -1,6 +1,6 @@
 // dstk.h //
 
-// dstk.h: structures and defines for the DSTAR switching-matric Toolkit
+// dstk.h: structures for the DSTAR switching-matric Toolkit
 
 
 // copyright (C) 2010 Kristoff Bonne ON1ARF
@@ -23,10 +23,25 @@
 //  release info:
 // 19 may 2011: version 0.0.1. Initial release
 
-// global DEFINEs
-#define ETHERNETMTU 1500
+// include global defines if not yet done
+#include "globaldef.h"
 
-#define forever 1
+
+// substructures
+
+// sequence numbers: defined as a union:
+// Either a 32 bit counter
+// or split up in two parts of 16 bits each
+typedef struct {
+	uint16_t seq1;
+	uint16_t seq2;	
+} seq32bit_str; // end struct
+
+typedef union {
+	seq32bit_str seq32;
+	uint32_t seq;
+} seq_u; // end union
+
 
 // datastream frame structure: header: common to all streams
 // However, not all fields are used in all streams
@@ -41,15 +56,19 @@ typedef struct {
 	// see defines below
 	uint16_t origin; 
 
-	// DTAK data-type: see defines below
+	// DSTK data-type: see defines below
 	uint32_t type;
 
-	// sequence numbers: split up in two parts of 16 bits each
+	// sequence numbers: defined as a union:
+	// Either a 32 bit counter
+	// or split up in two parts of 16 bits each
 	// can be used purely sequencial or contain timeing-information
 	// 'this to allow syncronisation between different streams of
 	// related content (e.g. DV-stream and DTMF-stream)
-	uint16_t seq1;
-	uint16_t seq2;
+
+	// union defined above
+	seq_u sequence;
+
 
 	// streamid: split up in two part of 16 bits each
 	// This allows to mark streams with additional information, like
@@ -67,17 +86,17 @@ typedef struct {
 
 
 // flags:
-#define DSTK_FLG_LAST 0x80 // last subframe in DSTK superframe
+#define DSTK_FLG_LAST 0x80 // last subframe of DSTK superframe
 
 
 // Source: identifies where a stream has originated
-// the DTAK source field is 16 bits, containing 2 octets
+// the DSTK source field is 16 bits, containing 2 octets
 // octet 1: namespace-id
 // "00": used by the original program-code of the DSTAR Audio Tookit
 // "FF": used for private or experimental address space
 // Octet 2 is only defined for namespace-id 0
 
-#define ORIGINMASK_GROUP 0xfff0
+#define ORIGINMASK_GROUP 0xff00
 
 // misc not belonging to a certain group
 #define ORIGIN_UNDEF 0x0000  // origin undefined or not applicable
@@ -136,7 +155,7 @@ typedef struct {
 
 
 
-// TYPES of DTAK frames
+// TYPES of DSTK frames
 // The DSTK types field is 32 bits, containing 4 octets
 // octet 1: namespace-id
 // "00": used by the original program-code of the DSTAR Audio Tookit
@@ -156,12 +175,11 @@ typedef struct {
 #define TYPE_APP_MSG 0x0002 // application announcements
 #define TYPE_APP_CMD 0x0003 // commands
 
-#define TYPE_RPC_IP  0x0101 // Copy of IP-frame send between gateway-server
-                            // and repeater-controller
-#define TYPE_RPC_RPC 0x0102 // Copy of frame send between gateway-server and repeater-controller,
+#define TYPE_RPC     0x0101 // Copy of frame transfered between
+									 // the gateway-server and repeater-controller
 
 #define TYPE_AMB 0x0200 // GROUP: AMB-streams
-#define TYPE_AMB_CFG 0x0201 // config frames
+#define TYPE_AMB_ART 0x0201 // addressing/routing frames
 #define TYPE_AMB_DV  0x0202 // DV frames
 #define TYPE_AMB_DVE 0x0203 // extended DV frames
 
@@ -169,7 +187,7 @@ typedef struct {
 #define TYPE_PCM_PCM 0x0301 // normal PCM-frame containing voice
 #define TYPE_PCM_FLL 0x0302 // empty PCM-frame used for stuffing when no
                             //  valid DV-frames received. Only used when the
-                            // "sendalways" DEBUG flag is set
+                            // "sendalways" flag is set
 #define TYPE_PCM_LOSREP 0x0303 // repetition of previous PCM-frame to deal
                                // with packetloss
 
@@ -209,8 +227,7 @@ typedef struct {
 // streams from RPC
 
 // flags related to AMB-streams originating from a conference:
-#define TYPEMASK_FLG_AMB_CNF_RPT1 0x00040000 // For AMBE-streams originating
-// from a conference-system (e.g. reflector).
+#define TYPEMASK_FLG_AMB_RPT1 0x00040000 
 // If set, the callsign/module of the conference is found in rpt1 field
 // If not set, the callsign/module of the conference is found in rpt2 field
 
@@ -227,87 +244,6 @@ unsigned char dstk_signature[] = {'D','S','T','K'};
 
 // start data structure configuration
 
-// data structures used for decoding RPC frames
-struct dstar_rpc_header {
-        char dstar_id[4];
-        u_short dstar_pkt_num;
-        u_char dstar_rs_flag;
-        u_char dstar_pkt_type;
-#define DSTAR_PKT_TYPE_DD   0x11
-#define DSTAR_PKT_TYPE_DV   0x12
-#define DSTAR_PKT_TYPE_MODULE_HEARD   0x21
-#define DSTAR_PKT_TYPE_ACK   0x00
-        u_short dstar_data_len;
-};
-
-// part 1 of internet-based D-STAR streams (callsign routed calls,
-//                  Dextra, dplus)
-// header of DSTAR packet part of an internetstream
-struct dstar_str_header1 {
-	char dstarstr_id[4];
-	uint8_t dstarstr_type;
-#define DSSTR_TYPE_CFG 0x10
-#define DSSTR_TYPE_DV 0x20
-	uint8_t dstarstr_unknown[3];
-}; // end
-
-
-// part 2 of internet-based D-STAR streams (callsign routed calls,
-//                  Dextra, dplus)
-// header of DSTAR packet part of an internetstream
-// this header is also present on RPC-generated streams
-// but it is known as dstar_dv_header overthere (see below)
-struct dstar_str_header2 {
-	uint8_t dstarstr_voicedata;
-#define DSSTR_VOICEDATA_VOICE 0x20
-	uint8_t dstarstr_unknown[3];
-	u_short dstarstr_streamid;
-}; //
-
-
-// DSTAR DV_HEADER: 2nd header inside packets as received/send
-// between the RPC and the gateway-server
-// this structure is equivalent to the dstar_str_header2 structure
-// (defined above) used by streams received/send over the internet
-struct dstar_dv_header {
-        u_char dv_unknown1;
-        u_char dv_unknown2;
-        u_char dv_unknown3;
-        u_char dv_module;
-        u_short dv_stream_id;
-};
-
-struct dstar_dv_data {
-        unsigned char dv_seqnr;
-        u_char dv_voice[9];
-        u_char dv_slowdata[3];
-};
-
-struct dstar_dv_rf_header {
-        unsigned char dv_seqnr;
-        u_char flags[3];
-        char rpt2_callsign[8];
-        char rpt1_callsign[8];
-        char your_callsign[8];
-        char my_callsign[8];
-        char my_callsign_ext[4];
-        u_char checksum[2];
-};
-
-
-struct dplus_size_header {
-	// dplus size header: 2 octets, i386-order, top3 bits contain flags
-	uint16_t size;
-}; // end 
-
-struct dplus_control_item {
-	// commands and replies of the dplus protocol use a control-item
-	// structure simular to the one used when communication with the
-	// DVdongle.
-
-	// this structure is not used when transporting DV frames
-	uint16_t controlitem;
-}; // end 
 
 // end data structure configuration
 

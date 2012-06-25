@@ -325,7 +325,7 @@ memset(dstkheader,0,sizeof(dstkheader_str));
 
 // fill in fixed parts
 dstkheader->version=1;
-// only one single subframe in a DTAK frame: set next-header to 0
+// only one single subframe in a DSTK frame: set next-header to 0
 dstkheader->flags=0 | DSTK_FLG_LAST;
 
 dstkheader->origin=htons(ORIGIN_CNF_DEX);

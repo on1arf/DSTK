@@ -28,7 +28,6 @@
 // release info:
 // 14 jun. 2011: version 0.0.1. Initial release
 
-#define __USE_GNU
 
 #define VERSION "0.0.1"
 #define DPL2AMB 1
@@ -47,6 +46,8 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 
+// added to get rid of annoying warning of strndup
+#define __USE_GNU
 #include <string.h>
 
 #include <unistd.h>
@@ -771,7 +772,7 @@ while (forever) {
 			memcpy(&texttoprint[33],&this_dv_rfhead->your_callsign,8);
 			memcpy(&texttoprint[45],&this_dv_rfhead->my_callsign,8);
 			memcpy(&texttoprint[54],&this_dv_rfhead->my_callsign_ext,4);
-			fprintf(stderr,"RPT: %s, Reflector-RPT = %d ",texttoprint,gatewayrpt);
+			fprintf(stderr,"RPT: %s, Reflector-RPT = %d\n",texttoprint,gatewayrpt);
 		}; // end if
 
 
