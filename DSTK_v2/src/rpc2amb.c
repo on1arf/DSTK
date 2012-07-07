@@ -800,7 +800,7 @@ fprintf(stderr,"ES%04X \n",dv_header->streamid);
 	MulticastOutAddr.sin6_port=htons((unsigned short int) d_port + thismodule_i * d_portincr);
 
 	// copy data
-	ret=sendto(sock_out,dstkhead_out,sizeof(dstkheader_str) + dstar_data_len,0,(struct sockaddr *) &MulticastOutAddr, sizeof(struct sockaddr_in6));
+	ret=sendto(sock_out,dstkhead_out,sizeof(dstkheader_str) + dstar_data_len + othersize,0,(struct sockaddr *) &MulticastOutAddr, sizeof(struct sockaddr_in6));
 
 	if (verboselevel >= 1) {
 		fprintf(stderr,"%c",thismodule_c);

@@ -113,7 +113,10 @@ int verboselevel=0;
 
 // outgoing udp stream
 int sock_out;
-struct sockaddr_in6 MulticastOutAddr;
+struct sockaddr_in6 MulticastOutAddr6;
+struct sockaddr_in MulticastOutAddr4;
+int v4orv6_out=-1; // 0=ipv4, 1=ipv6
+char loopch=0;
 
 
 // headers
@@ -250,26 +253,53 @@ if (pcap_setfilter(pcaphandle, &fp) == -1) {
 }
 
 
-// /// open socket for outgoing UDP
-sock_out=open_for_multicast_out(verboselevel);
+// packets are send to multicast address, UDP port 40000 or 40001
+MulticastOutAddr4.sin_family = AF_INET; 
+MulticastOutAddr4.sin_port = htons((unsigned short int) d_port);
+
+MulticastOutAddr6.sin6_family = AF_INET6; 
+MulticastOutAddr6.sin6_scope_id = 1;
+MulticastOutAddr6.sin6_port = htons((unsigned short int) d_port);
+
+
+// try to resolv for ipv4
+ret=inet_pton(AF_INET,d_ipaddress,(void *)&MulticastOutAddr4.sin_addr);
+if (ret == 1) {
+	v4orv6_out=0;
+} else {
+	// coulf not convert address from text into valid address, try again in ipv6
+	ret=inet_pton(AF_INET6,d_ipaddress,(void *)&MulticastOutAddr6.sin6_addr);
+
+	if (ret != 1) {	
+		fprintf(stderr,"Error: could not convert %s into valid address. Exiting\n",d_ipaddress);
+		exit(1);
+	}; // end if
+
+	v4orv6_out=1;
+}; // end if
+
+
+// open socket for outgoing UDP
+if (v4orv6_out) {
+	// ipv6
+	sock_out=socket(AF_INET6,SOCK_DGRAM,0);
+} else {
+	// ipv4
+	sock_out=socket(AF_INET,SOCK_DGRAM,0);
+}; // end else - if
 
 if (sock_out <= 0) {
-	fprintf(stderr,"Error during open_for_multicast_out! Exiting!\n");
+	fprintf(stderr,"Could not create socket for multicast UDP out! Exiting!\n");
 	exit(-1);
 }; // end if
 
-// packets are send to multicast address, UDP port 40000 or 40001
-MulticastOutAddr.sin6_family = AF_INET6; 
-MulticastOutAddr.sin6_scope_id = 1;
-MulticastOutAddr.sin6_port = htons((unsigned short int) d_port);
 
-
-ret=inet_pton(AF_INET6,d_ipaddress,(void *)&MulticastOutAddr.sin6_addr);
-if (ret != 1) {
-	fprintf(stderr,"Error: could not convert %s into valid address. Exiting\n",d_ipaddress);
-	exit(1);
+// set socket options for IP multicast
+// should be ignored for unicast traffic
+if (setsockopt(sock_out, IPPROTO_IP, IP_MULTICAST_LOOP, (char *)&loopch, sizeof(loopch)) < 0) {
+	fprintf(stderr,"Error: could not set IP_MULTICAST_LOOP socket options! Exiting!\n");
+	exit(-1);
 }; // end if
-
 
 
 
@@ -376,11 +406,13 @@ while (forever) {
 
 	udp_len = ntohs(rpchead->udpheader.len);
 
-	// We do not check on UDP port-number as that has already been filtered out by the filter
+	// We do not check on UDP port-number as that has already been
+	// filtered out by the filter
 
 
 	// First 4 octets should be 'DSTR'
-	if (strncmp("DSTR", rpchead->rpcheader.dstar_id,4) != 0) {
+	// cast 2nd argument to (char *) to avoid warning about signedness
+	if (strncmp("DSTR", (char *)rpchead->rpcheader.dstar_id,4) != 0) {
 		// not a DSTAR packet
 		if (verboselevel > 1) {
 			fprintf(stderr,"Error: missing DSTR signature\n");
@@ -411,11 +443,17 @@ while (forever) {
 
 	// send DSTAR frame
 	// size if udp_len (data + UDP header) + size of IP-header
-	ret=sendto(sock_out,dstkheader,udp_len+sizeof(struct iphdr)+sizeof(dstkheader_str),0,(struct sockaddr *) &MulticastOutAddr, sizeof(MulticastOutAddr));
+	if (v4orv6_out) {
+		// ipv6
+		ret=sendto(sock_out,dstkheader,udp_len+sizeof(struct iphdr)+sizeof(dstkheader_str),0,(struct sockaddr *) &MulticastOutAddr6, sizeof(MulticastOutAddr6));
+	} else {
+		// ipv4
+		ret=sendto(sock_out,dstkheader,udp_len+sizeof(struct iphdr)+sizeof(dstkheader_str),0,(struct sockaddr *) &MulticastOutAddr4, sizeof(MulticastOutAddr4));
+	}; // end if
 
 	if (ret < 0) {
 		if (verboselevel >= 1) {
-			fprintf(stderr,"DSTK packet could not be send. Error: %d (%s)!\n",errno,strerror(errno)); 
+			fprintf(stderr,"Warning: DSTK packet could not be send. Error: %d (%s)!\n",errno,strerror(errno)); 
 		}; // end if
 	}; // end if
 

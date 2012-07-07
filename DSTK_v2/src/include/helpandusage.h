@@ -43,6 +43,13 @@ void usage (char * prog) {
 	return;
 #endif
 
+#ifdef UDPBOUNCE
+	fprintf(stderr,"Usage: %s [-v] [-t timeout] [-mj multicast-ipaddress] -s udpport -d ipaddress udpport\n",prog);
+	fprintf(stderr,"Usage: -V\n");
+	fprintf(stderr,"Usage: -h\n");
+	return;
+#endif
+
 // unknown application
 fprintf(stderr,"Error, called \"usage\" in unknown application! \n");
 
@@ -203,6 +210,27 @@ void help (char * prog) {
 	fprintf(stderr,"-6: force ipv6-only address resolution of reflectorhost\n");
 	fprintf(stderr,"\n");
 	fprintf(stderr,"-v: increase verboselevel (may be used multiple times)\n");
+	return;
+#endif
+
+#ifdef UDPBOUNCE
+	fprintf(stderr,"%s: Retransmit UDP packets from/to unicast or multicast\n",prog);
+	fprintf(stderr,"\n");
+	fprintf(stderr,"Usage: %s [-v] [-t timeout] [-mj multicast-ipaddress] -s udpport -d ipaddress udpport\n",prog);
+	fprintf(stderr,"\n");
+	fprintf(stderr,"This application retransmits UDP unicast or multicast packets it receives via\n");
+	fprintf(stderr,"unicast or multicast.\n");
+	fprintf(stderr,"It can be used to transport bounce multicast UDP packet (as used by the\n");
+	fprintf(stderr,"DSTK) to external hosts using unicast UDP\n");
+	fprintf(stderr,"\n");
+	fprintf(stderr,"Options:\n");
+	fprintf(stderr,"-s: SOURCE-UDP port\n");
+	fprintf(stderr,"-d: DESTINATION-UDP ipaddress port\n");
+	fprintf(stderr,"\n");
+	fprintf(stderr,"-mj: do a multicast join request for a multicast address \n");
+	fprintf(stderr,"\n");
+	fprintf(stderr,"-t: timeout: exit the application if no data received during a given number of seconds. (Default 0: no timeout) \n");
+	fprintf(stderr,"\n");
 	return;
 #endif
 

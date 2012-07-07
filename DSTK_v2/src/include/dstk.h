@@ -227,7 +227,8 @@ typedef struct {
 // streams from RPC
 
 // flags related to AMB-streams originating from a conference:
-#define TYPEMASK_FLG_AMB_RPT1 0x00040000 
+#define TYPEMASK_FLG_AMB_CNF_RPT1 0x00040000 // For AMBE-streams originating
+// from a conference-system (e.g. reflector).
 // If set, the callsign/module of the conference is found in rpt1 field
 // If not set, the callsign/module of the conference is found in rpt2 field
 

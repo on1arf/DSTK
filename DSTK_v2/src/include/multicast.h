@@ -27,6 +27,11 @@
 
 #define MULTICASTBUFFSIZE 65536
 
+// ############################
+// ############################
+// # OPEN AND JOIN MULTICAST ##
+// ############################
+
 int open_and_join_mc (char * multicastaddress, int port, int verboselevel) {
 
 ///////////////////////
@@ -157,6 +162,13 @@ if (ret != 0) {
 return(sock);
 
 }; // end function open_and_join_mc
+
+
+
+// ############################
+// ############################
+// # OPEN FOR MULTICAST  OUT ##
+// ############################
 
 int open_for_multicast_out (int verboselevel) {
 int udpsd;

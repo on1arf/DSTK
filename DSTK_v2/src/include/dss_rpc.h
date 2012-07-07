@@ -17,15 +17,15 @@
 
 // RPC header
 struct dstar_rpc_header {
-        char dstar_id[4];
-        u_short dstar_pkt_num;
-        u_char dstar_rs_flag;
-        u_char dstar_pkt_type;
+        unsigned char dstar_id[4];
+        uint16_t dstar_pkt_num;
+        uint8_t dstar_rs_flag;
+        uint8_t dstar_pkt_type;
 #define DSTAR_PKT_TYPE_DD   0x11
 #define DSTAR_PKT_TYPE_DV   0x12
 #define DSTAR_PKT_TYPE_MODULE_HEARD   0x21
 #define DSTAR_PKT_TYPE_ACK   0x00
-        u_short dstar_data_len;
+        uint16_t dstar_data_len;
 };
 
 
